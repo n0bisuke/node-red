@@ -71,6 +71,48 @@ for (var i = 0; i < args.length; i++) {
 settings.flowFile = settings.flowFile;
 
 var red = RED.init(server,settings);
+
+// Hono エンドポイントの追加テスト
+honoApp.get('/nodes', async (c) => {
+    const redNodes = require('./red/nodes.js');
+    return c.text(redNodes.getNodeConfigs(), 200, {
+        'Content-Type': 'text/plain'
+    });
+});
+
+// HonoアプリケーションをExpressミドルウェアとして統合
+
+// Honoを手動でExpressミドルウェアに変換
+const honoToExpress = (req, res, next) => {
+    // HonoのRequest オブジェクトを作成
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const honoRequest = new Request(url, {
+        method: req.method,
+        headers: req.headers,
+        body: req.method !== 'GET' && req.method !== 'HEAD' ? req : undefined
+    });
+
+    honoApp.fetch(honoRequest)
+        .then(async (response) => {
+            if (response.status === 404) {
+                next(); // Honoで処理されなかった場合はExpressに委譲
+                return;
+            }
+
+            res.status(response.status);
+            response.headers.forEach((value, key) => {
+                res.setHeader(key, value);
+            });
+
+            const body = await response.text();
+            res.send(body);
+        })
+        .catch(() => {
+            next(); // エラーの場合はExpressに委譲
+        });
+};
+
+app.use('/hono', honoToExpress);
 app.use(settings.httpRoot,red);
 
 // 将来的にHonoに移行するための準備
