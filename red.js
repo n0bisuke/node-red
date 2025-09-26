@@ -119,7 +119,7 @@ honoApp.post('/flows', async (c) => {
                 } else {
                     console.log('[hono] Flows saved to:', flowfile);
                 }
-                resolve(c.text('', 204));
+                resolve(new Response(null, { status: 204 }));
             });
         });
     } catch (error) {
@@ -128,17 +128,204 @@ honoApp.post('/flows', async (c) => {
 });
 
 // UI関連エンドポイントのHono実装
-// ルートパス（/）のリダイレクト処理
+// 静的ファイル配信（メインUI）
 honoApp.get('/', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+
     const url = new URL(c.req.url);
     if (!url.pathname.endsWith('/')) {
         return c.redirect(url.pathname + '/', 301);
     }
-    // 静的ファイル配信は別途実装が必要
-    return c.text('Node-RED UI - Static files need implementation', 200, {
-        'Content-Type': 'text/html'
+
+    // index.htmlを配信
+    const indexPath = path.resolve(__dirname + '/public/index.html');
+    return new Promise((resolve, reject) => {
+        fs.readFile(indexPath, 'utf8', (err, data) => {
+            if (err) {
+                resolve(c.text('Node-RED UI - index.html not found', 404));
+            } else {
+                resolve(c.html(data));
+            }
+        });
     });
 });
+
+// 個別の静的ファイルルート（具体的なファイル拡張子のみ）
+honoApp.get('/*.css', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const requestPath = c.req.path;
+    const fullPath = path.resolve(__dirname + '/public' + requestPath);
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(fullPath, (err, data) => {
+            if (err) {
+                resolve(c.notFound());
+            } else {
+                resolve(c.body(data, 200, { 'Content-Type': 'text/css' }));
+            }
+        });
+    });
+});
+
+honoApp.get('/*.js', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const requestPath = c.req.path;
+    const fullPath = path.resolve(__dirname + '/public' + requestPath);
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(fullPath, (err, data) => {
+            if (err) {
+                resolve(c.notFound());
+            } else {
+                resolve(c.body(data, 200, { 'Content-Type': 'application/javascript' }));
+            }
+        });
+    });
+});
+
+honoApp.get('/*.png', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const requestPath = c.req.path;
+    const fullPath = path.resolve(__dirname + '/public' + requestPath);
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(fullPath, (err, data) => {
+            if (err) {
+                resolve(c.notFound());
+            } else {
+                resolve(c.body(data, 200, { 'Content-Type': 'image/png' }));
+            }
+        });
+    });
+});
+
+honoApp.get('/*.jpg', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const requestPath = c.req.path;
+    const fullPath = path.resolve(__dirname + '/public' + requestPath);
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(fullPath, (err, data) => {
+            if (err) {
+                resolve(c.notFound());
+            } else {
+                resolve(c.body(data, 200, { 'Content-Type': 'image/jpeg' }));
+            }
+        });
+    });
+});
+
+honoApp.get('/*.ico', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const requestPath = c.req.path;
+    const fullPath = path.resolve(__dirname + '/public' + requestPath);
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(fullPath, (err, data) => {
+            if (err) {
+                resolve(c.notFound());
+            } else {
+                resolve(c.body(data, 200, { 'Content-Type': 'image/x-icon' }));
+            }
+        });
+    });
+});
+
+// Bootstrap、jQuery等のディレクトリアクセス
+honoApp.get('/bootstrap/*', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const requestPath = c.req.path;
+    const fullPath = path.resolve(__dirname + '/public' + requestPath);
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(fullPath, (err, data) => {
+            if (err) {
+                resolve(c.notFound());
+            } else {
+                const ext = path.extname(requestPath).toLowerCase();
+                let contentType = 'text/plain';
+                if (ext === '.css') contentType = 'text/css';
+                else if (ext === '.js') contentType = 'application/javascript';
+
+                resolve(c.body(data, 200, { 'Content-Type': contentType }));
+            }
+        });
+    });
+});
+
+honoApp.get('/jquery/*', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const requestPath = c.req.path;
+    const fullPath = path.resolve(__dirname + '/public' + requestPath);
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(fullPath, (err, data) => {
+            if (err) {
+                resolve(c.notFound());
+            } else {
+                const ext = path.extname(requestPath).toLowerCase();
+                let contentType = 'text/plain';
+                if (ext === '.css') contentType = 'text/css';
+                else if (ext === '.js') contentType = 'application/javascript';
+
+                resolve(c.body(data, 200, { 'Content-Type': contentType }));
+            }
+        });
+    });
+});
+
+honoApp.get('/orion/*', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const requestPath = c.req.path;
+    const fullPath = path.resolve(__dirname + '/public' + requestPath);
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(fullPath, (err, data) => {
+            if (err) {
+                resolve(c.notFound());
+            } else {
+                const ext = path.extname(requestPath).toLowerCase();
+                let contentType = 'text/plain';
+                if (ext === '.css') contentType = 'text/css';
+                else if (ext === '.js') contentType = 'application/javascript';
+
+                resolve(c.body(data, 200, { 'Content-Type': contentType }));
+            }
+        });
+    });
+});
+
+honoApp.get('/red/*', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const requestPath = c.req.path;
+    const fullPath = path.resolve(__dirname + '/public' + requestPath);
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(fullPath, (err, data) => {
+            if (err) {
+                resolve(c.notFound());
+            } else {
+                const ext = path.extname(requestPath).toLowerCase();
+                let contentType = 'text/plain';
+                if (ext === '.css') contentType = 'text/css';
+                else if (ext === '.js') contentType = 'application/javascript';
+
+                resolve(c.body(data, 200, { 'Content-Type': contentType }));
+            }
+        });
+    });
+});
+
 
 // アイコンエンドポイント
 honoApp.get('/icons/:icon', async (c) => {
@@ -230,11 +417,19 @@ honoApp.get('/serialports', async (c) => {
 const honoToExpress = (req, res, next) => {
     // HonoのRequest オブジェクトを作成
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const honoRequest = new Request(url, {
+
+    const requestInit = {
         method: req.method,
-        headers: req.headers,
-        body: req.method !== 'GET' && req.method !== 'HEAD' ? req : undefined
-    });
+        headers: req.headers
+    };
+
+    // POSTリクエストの場合はbodyとduplexオプションを設定
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+        requestInit.body = req;
+        requestInit.duplex = 'half';
+    }
+
+    const honoRequest = new Request(url, requestInit);
 
     honoApp.fetch(honoRequest)
         .then(async (response) => {
@@ -256,8 +451,10 @@ const honoToExpress = (req, res, next) => {
         });
 };
 
-app.use('/hono', honoToExpress);
+// Express RED統合を先に有効化（動的ルート優先）
 app.use(settings.httpRoot,red);
+// Honoを後から追加（静的ファイル等のフォールバック）
+app.use('/', honoToExpress);
 
 // 将来的にHonoに移行するための準備
 // honoApp.mount(settings.httpRoot, convertExpressToHono(red));
