@@ -80,6 +80,150 @@ honoApp.get('/nodes', async (c) => {
     });
 });
 
+// /flows GETエンドポイントのHono実装
+honoApp.get('/flows', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const flowfile = settings.flowFile || 'flows_'+require('os').hostname()+'.json';
+
+    return new Promise((resolve, reject) => {
+        fs.exists(flowfile, (exists) => {
+            if (exists) {
+                fs.readFile(path.resolve(flowfile), 'utf8', (err, data) => {
+                    if (err) {
+                        resolve(c.text('[]', 200, {'Content-Type': 'application/json'}));
+                    } else {
+                        resolve(c.text(data, 200, {'Content-Type': 'application/json'}));
+                    }
+                });
+            } else {
+                resolve(c.text('[]', 200, {'Content-Type': 'application/json'}));
+            }
+        });
+    });
+});
+
+// /flows POSTエンドポイントのHono実装
+honoApp.post('/flows', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const flowfile = settings.flowFile || 'flows_'+require('os').hostname()+'.json';
+
+    try {
+        const body = await c.req.text();
+
+        return new Promise((resolve, reject) => {
+            fs.writeFile(flowfile, body, (err) => {
+                if (err) {
+                    console.log('[hono] Error saving flows:', err);
+                } else {
+                    console.log('[hono] Flows saved to:', flowfile);
+                }
+                resolve(c.text('', 204));
+            });
+        });
+    } catch (error) {
+        return c.text('Error processing request', 500);
+    }
+});
+
+// UI関連エンドポイントのHono実装
+// ルートパス（/）のリダイレクト処理
+honoApp.get('/', async (c) => {
+    const url = new URL(c.req.url);
+    if (!url.pathname.endsWith('/')) {
+        return c.redirect(url.pathname + '/', 301);
+    }
+    // 静的ファイル配信は別途実装が必要
+    return c.text('Node-RED UI - Static files need implementation', 200, {
+        'Content-Type': 'text/html'
+    });
+});
+
+// アイコンエンドポイント
+honoApp.get('/icons/:icon', async (c) => {
+    const fs = require('fs');
+    const path = require('path');
+    const icon = c.req.param('icon');
+
+    const icon_paths = [
+        path.resolve(__dirname + '/nodes/core/icons'),
+        path.resolve(__dirname + '/nodes/io/icons'),
+        path.resolve(__dirname + '/nodes/social/icons'),
+        path.resolve(__dirname + '/nodes/hardware/icons'),
+        path.resolve(__dirname + '/nodes/analysis/icons'),
+        path.resolve(__dirname + '/nodes/storage/icons')
+    ];
+
+    return new Promise((resolve, reject) => {
+        let found = false;
+        for (let p of icon_paths) {
+            const iconPath = path.join(p, icon);
+            if (fs.existsSync(iconPath)) {
+                fs.readFile(iconPath, (err, data) => {
+                    if (err) {
+                        resolve(c.notFound());
+                    } else {
+                        const ext = path.extname(icon).toLowerCase();
+                        let contentType = 'image/png';
+                        if (ext === '.svg') contentType = 'image/svg+xml';
+                        if (ext === '.gif') contentType = 'image/gif';
+                        if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+
+                        resolve(c.body(data, 200, {
+                            'Content-Type': contentType
+                        }));
+                    }
+                });
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            // デフォルトアイコン
+            const defaultIcon = path.resolve(__dirname + '/public/icons/arrow-in.png');
+            fs.readFile(defaultIcon, (err, data) => {
+                if (err) {
+                    resolve(c.notFound());
+                } else {
+                    resolve(c.body(data, 200, {
+                        'Content-Type': 'image/png'
+                    }));
+                }
+            });
+        }
+    });
+});
+
+// コアノードのHTTP APIをHono実装
+// Debug ノード API
+honoApp.post('/debug/:id', async (c) => {
+    const id = c.req.param('id');
+    const body = await c.req.text();
+
+    // デバッグノードの処理をここに実装
+    console.log('[hono] Debug node:', id, 'data:', body);
+
+    return c.text('OK', 200);
+});
+
+// Inject ノード API
+honoApp.post('/inject/:id', async (c) => {
+    const id = c.req.param('id');
+
+    // Injectノードの処理をここに実装
+    console.log('[hono] Inject triggered for node:', id);
+
+    return c.text('OK', 200);
+});
+
+// Serial ポート API（存在する場合）
+honoApp.get('/serialports', async (c) => {
+    // シリアルポート一覧を返す
+    // 実際の実装では利用可能なポートをスキャンする
+    return c.json([]);
+});
+
 // HonoアプリケーションをExpressミドルウェアとして統合
 
 // Honoを手動でExpressミドルウェアに変換
