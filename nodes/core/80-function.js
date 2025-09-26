@@ -32,7 +32,7 @@ function FunctionNode(n) {
         this.script = vm.createScript(functionText);
         this.on("input", function(msg) {
                 if (msg != null) {
-                    var sandbox = {msg:msg,console:console,util:util,Buffer:Buffer,context:this.context};
+                    var sandbox = {msg:msg,console:console,util:util,Buffer:Buffer,context:this.context,process:process};
                     try {
                         this.script.runInNewContext(sandbox);
                         var results = sandbox.results;
@@ -45,7 +45,7 @@ function FunctionNode(n) {
                         if (msg._topic) {
                             for (var m in results) {
                                 if (results[m]) {
-                                    if (util.isArray(results[m])) {
+                                    if (Array.isArray(results[m])) {
                                         for (var n in results[m]) {
                                             results[m][n]._topic = msg._topic;
                                         }

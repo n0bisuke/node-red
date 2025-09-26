@@ -41,13 +41,10 @@ function HTTPIn(n) {
 	}
 	
 	this.on("close",function() {
-	        var routes = RED.app.routes[this.method];
-	        for (var i in routes) {
-	            if (routes[i].path == this.url) {
-	                routes.splice(i,1);
-	                //break;
-	            }
-	        }
+	        // Express 4では app.routes は存在しない
+	        // ルートの削除は Express 4 では直接的にはサポートされていない
+	        // 必要に応じて alternative solution を実装する
+	        console.log('[httpin] Closing HTTP endpoint: ' + this.method + ' ' + this.url);
 	});
 }
 
