@@ -18,11 +18,14 @@ var https = require('https');
 var express = require("express");
 var crypto = require("crypto");
 var basicAuth = require("basic-auth");
+var { Hono } = require('hono');
+var { serve } = require('@hono/node-server');
 var settings = require("./settings");
 var RED = require("./red/red.js");
 
 var server;
 var app = express();
+var honoApp = new Hono(); // 将来のHono移行用
 
 if (settings.https) {
     server = https.createServer(settings.https,function(req,res){app(req,res);});
@@ -70,10 +73,13 @@ settings.flowFile = settings.flowFile;
 var red = RED.init(server,settings);
 app.use(settings.httpRoot,red);
 
+// 将来的にHonoに移行するための準備
+// honoApp.mount(settings.httpRoot, convertExpressToHono(red));
+
 RED.start();
 
 server.listen(settings.uiPort,function() {
-	console.log('[red] Server now running at http'+(settings.https?'s':'')+'://127.0.0.1:'+settings.uiPort+settings.httpRoot);
+	console.log('[red] Server now running at http'+(settings.https?'s':'')+'://127.0.0.1:'+settings.httpRoot);
 });
 
 process.on('uncaughtException',function(err) {

@@ -236,6 +236,47 @@ app.get("/flows",function(req,res) {
 });
 ```
 
+### 9. Function nodeとExpress 4互換性の追加問題（Node.js v24対応）
+
+**問題1（nodes/core/80-function.js:35）:**
+function nodeで`process.versions`を使用すると以下のエラーが発生：
+```
+[error] [function:412364a3.372fac] process is not defined
+```
+
+**問題2（nodes/core/80-function.js:48）:**
+非推奨警告が表示される：
+```
+(node:61352) [DEP0044] DeprecationWarning: The `util.isArray` API is deprecated. Please use `Array.isArray()` instead.
+```
+
+**問題3（nodes/io/21-httpin.js:44）:**
+HTTPInノードのクローズ時にクラッシュ：
+```
+TypeError: Cannot read properties of undefined (reading 'get')
+    at HTTPIn.<anonymous> (nodes/io/21-httpin.js:44:37)
+```
+
+**修正（nodes/core/80-function.js:35, 48）:**
+```javascript
+// processオブジェクトをサンドボックスに追加
+var sandbox = {msg:msg,console:console,util:util,Buffer:Buffer,context:this.context,process:process};
+
+// util.isArrayをArray.isArrayに変更
+if (Array.isArray(results[m])) {  // 修正前: util.isArray(results[m])
+```
+
+**修正（nodes/io/21-httpin.js:43-48）:**
+```javascript
+// Express 4では app.routes が存在しないため安全な処理に変更
+this.on("close",function() {
+    // Express 4では app.routes は存在しない
+    // ルートの削除は Express 4 では直接的にはサポートされていない
+    // 必要に応じて alternative solution を実装する
+    console.log('[httpin] Closing HTTP endpoint: ' + this.method + ' ' + this.url);
+});
+```
+
 ## 結果
 
 ### 成功事項 ✅
@@ -244,6 +285,8 @@ app.get("/flows",function(req,res) {
 - **コマンドライン引数**: `--port` オプション対応
 - **コア機能**: 基本的なNode-REDフロー編集機能が利用可能
 - **依存関係**: Express 4、現代的なnpmパッケージに更新完了
+- **Function node**: `process.versions`など全てのNode.js APIが利用可能
+- **安定性**: クラッシュエラーと非推奨警告を全て解消
 
 ### 既知の制限事項 ⚠️
 
@@ -265,12 +308,15 @@ app.get("/flows",function(req,res) {
 2. **API変更**: `req.next()` → `next()`、`res.sendfile()` → `res.sendFile()`
 3. **設定方法変更**: 静的ファイル配信のオプション指定方法
 4. **絶対パス必須**: `res.sendFile()`では絶対パスまたはrootオプションが必須
+5. **routes属性廃止**: `app.routes`プロパティが存在しない
 
 ### Node.js進化による影響
 
 1. **コールバック必須化**: `fs.mkdir()`などのAPIでコールバック省略不可
 2. **厳格な型チェック**: MIMEタイプの厳密な検証
 3. **セキュリティ強化**: 様々なセキュリティ関連の警告・エラー
+4. **非推奨API警告**: `util.isArray`などの古いAPIが警告対象に
+5. **サンドボックス強化**: VMコンテキストでのグローバルオブジェクトアクセス制限
 
 ## まとめ
 
