@@ -202,6 +202,40 @@ for (var i = 0; i < args.length; i++) {
 }
 ```
 
+### 8. res.sendFileの絶対パス問題（追加修正）
+
+**問題（red/server.js:51）:**
+Node.js v24環境での起動時に以下の致命的エラーが発生：
+```
+TypeError: path must be absolute or specify root to res.sendFile
+    at ServerResponse.sendFile (/Users/.../node_modules/express/lib/response.js:441:11)
+    at /Users/.../red/server.js:51:29
+```
+
+**原因:**
+Express 4では`res.sendFile()`に絶対パスまたはrootオプションの指定が必須になったが、相対パス`flowfile`が使用されていた。
+
+**修正（red/server.js:17-19, 52）:**
+```javascript
+// pathモジュールを追加
+var fs = require('fs');
+var util = require('util');
+var path = require('path');  // 追加
+
+// res.sendFileを絶対パスに修正
+app.get("/flows",function(req,res) {
+    fs.exists(flowfile, function (exists) {
+        if (exists) {
+            res.sendFile(path.resolve(flowfile));  // 修正前: res.sendFile(flowfile);
+        } else {
+            res.writeHead(200, {'Content-Type': 'text/plain'});
+            res.write("[]");
+            res.end();
+        }
+    });
+});
+```
+
 ## 結果
 
 ### 成功事項 ✅
@@ -230,6 +264,7 @@ for (var i = 0; i < args.length; i++) {
 1. **Middleware分離**: body-parser、basic-authなどが別パッケージに
 2. **API変更**: `req.next()` → `next()`、`res.sendfile()` → `res.sendFile()`
 3. **設定方法変更**: 静的ファイル配信のオプション指定方法
+4. **絶対パス必須**: `res.sendFile()`では絶対パスまたはrootオプションが必須
 
 ### Node.js進化による影響
 

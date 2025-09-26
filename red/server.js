@@ -16,6 +16,7 @@
 
 var fs = require('fs');
 var util = require('util');
+var path = require('path');
 var createUI = require("./ui");
 var redNodes = require("./nodes");
 
@@ -48,7 +49,7 @@ function createServer(_server,settings) {
     app.get("/flows",function(req,res) {
             fs.exists(flowfile, function (exists) {
                     if (exists) {
-                        res.sendFile(flowfile);
+                        res.sendFile(path.resolve(flowfile));
                     } else {
                         res.writeHead(200, {'Content-Type': 'text/plain'});
                         res.write("[]");
