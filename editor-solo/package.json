@@ -1,0 +1,18 @@
+{
+  "name": "editor-solo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone Node-RED Editor server (safe mode) for experimenting with a separate runtime",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "@node-red/runtime": "^4.1.0",
+    "@node-red/editor-api": "^4.1.0",
+    "@node-red/editor-client": "^4.1.0",
+    "@node-red/nodes": "^4.1.0",
+    "@node-red/util": "^4.1.0"
+  }
+}
