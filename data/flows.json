@@ -1,17 +1,3 @@
-# ランタイムだけ動かす版
-
-Node.js v22
-
-## インストールと実行
-
-```
-$ npm i
-$ node run.mjs
-```
-
-## 試すフロー
-
-```json
 [
     {
         "id": "function-logger",
@@ -61,4 +47,3 @@ $ node run.mjs
         ]
     }
 ]
-```
