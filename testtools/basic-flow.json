@@ -1,0 +1,47 @@
+[
+  {
+    "id": "flow-main",
+    "type": "tab",
+    "label": "Main",
+    "disabled": false,
+    "info": ""
+  },
+  {
+    "id": "function-logger",
+    "type": "function",
+    "z": "flow-main",
+    "name": "Console Logger",
+    "func": "const now = new Date();\nconst counter = context.get('counter') || 0;\ncontext.set('counter', counter + 1);\nconst message = `はろー🚀 Node-RED Runtime Working! Count: ${counter + 1}, Time: ${now.toLocaleString('ja-JP')}`;\nnode.warn(message);\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 320,
+    "y": 80,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "inject-timer",
+    "type": "inject",
+    "z": "flow-main",
+    "name": "3秒毎実行",
+    "props": [
+      { "p": "payload" },
+      { "p": "topic", "vt": "str" }
+    ],
+    "repeat": "3",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "2",
+    "topic": "heartbeat",
+    "payload": "",
+    "payloadType": "date",
+    "x": 140,
+    "y": 80,
+    "wires": [["function-logger"]]
+  }
+]
+

@@ -4,7 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node run.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "tools:push": "node testtools/send-flow.mjs",
+    "tools:get": "node testtools/get-flows.mjs",
+    "tools:start": "node testtools/set-state.mjs start",
+    "tools:stop": "node testtools/set-state.mjs stop"
   },
   "keywords": [],
   "author": "",
