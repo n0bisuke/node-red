@@ -13,6 +13,7 @@
     "@node-red/editor-api": "^4.1.0",
     "@node-red/editor-client": "^4.1.0",
     "@node-red/nodes": "^4.1.0",
-    "@node-red/util": "^4.1.0"
+    "@node-red/util": "^4.1.0",
+    "bcryptjs": "^2.4.3"
   }
 }

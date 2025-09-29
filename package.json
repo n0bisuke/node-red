@@ -9,7 +9,8 @@
     "tools:push": "node testtools/send-flow.mjs",
     "tools:get": "node testtools/get-flows.mjs",
     "tools:start": "node testtools/set-state.mjs start",
-    "tools:stop": "node testtools/set-state.mjs stop"
+    "tools:stop": "node testtools/set-state.mjs stop",
+    "editor:start": "npm --prefix editor-solo start"
   },
   "keywords": [],
   "author": "",

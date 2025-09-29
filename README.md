@@ -16,6 +16,33 @@ $ NR_SERVER_TOKEN=your-secret node run.mjs
 
 起動すると Node-RED ランタイムが headless モードで立ち上がり、同時にシンプルな HTTP API が開きます。
 
+### ランタイムのみで起動（サーバー無効化）
+
+```
+ENABLE_API_SERVER=false node run.mjs
+```
+
+`ENABLE_API_SERVER=false` を指定すると、HTTP API サーバー部分を起動しません。別プロジェクトのサーバーと分離運用する際に利用します。
+
+## 分離エディタ（editor-solo）
+
+実験用に、公式エディタを独立起動するサブプロジェクトを同梱しています（safe modeで実行停止）。
+
+起動手順:
+```
+$ npm run editor:start   # 初回は editor-solo ディレクトリで npm i が必要
+```
+
+環境変数（例）:
+- `EDITOR_PORT=1881`（デフォルト）
+- `REMOTE_BASE_URL=http://localhost:1880`（このリポジトリのランタイム）
+- `REMOTE_TOKEN=<NR_SERVER_TOKEN>`
+
+リモートへデプロイ（ミラー送信）:
+```
+curl -X POST http://localhost:1881/admin/remote/deploy
+```
+
 ## API エンドポイント
 
 - `GET /health` ランタイムの起動状態と現在の `rev` を返します。
