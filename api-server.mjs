@@ -1,6 +1,9 @@
 // api-server.mjs - Minimal HTTP API around Node-RED runtime (extracted)
 import http from 'http';
 import { URL } from 'url';
+// @node-red/util is CommonJS; import default and destructure
+import utilPkg from '@node-red/util';
+const utilEvents = utilPkg.events;
 
 export async function startApiServer({ runtime }) {
   // Node-RED のデフォルトに合わせて 1880 を既定ポートに
@@ -117,6 +120,68 @@ export async function startApiServer({ runtime }) {
       }
     }
 
+    // Server-Sent Events: stream debug messages from runtime
+    if (req.method === 'GET' && pathname === '/events/debug') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'Access-Control-Allow-Origin': CORS_ORIGIN
+      });
+      res.write(':ok\n\n');
+
+      const sendEvent = (data) => {
+        try {
+          res.write(`data: ${JSON.stringify(data)}\n\n`);
+        } catch (e) {
+          // ignore
+        }
+      };
+      const commsHandler = (ev) => {
+        if (ev && ev.topic === 'debug') {
+          sendEvent(ev.data);
+        }
+      };
+      utilEvents.on('comms', commsHandler);
+      const keepAlive = setInterval(() => {
+        try { res.write(':keepalive\n\n'); } catch {}
+      }, 15000);
+      req.on('close', () => {
+        clearInterval(keepAlive);
+        utilEvents.off('comms', commsHandler);
+        try { res.end(); } catch {}
+      });
+      return; // do not fall-through
+    }
+
+    // Inject trigger for a specific node id
+    if (req.method === 'POST' && /^\/inject\//.test(pathname)) {
+      try {
+        const id = pathname.split('/')[2];
+        if (!id) { return badRequest(res, 'invalid_inject_id'); }
+        // Use internal runtime to access the node instance
+        const internal = runtime._;
+        const node = internal && internal.nodes && internal.nodes.getNode ? internal.nodes.getNode(id) : null;
+        if (!node) { res.statusCode = 404; res.setHeader('Content-Type','application/json'); return res.end(JSON.stringify({ error: 'not_found' })); }
+        let body = {};
+        try { body = await readJson(req); } catch(e) { /* ignore if no body */ body = {}; }
+        try {
+          if (body && body.__user_inject_props__) {
+            node.receive(body);
+          } else {
+            node.receive();
+          }
+        } catch (err) {
+          return serverError(res, err);
+        }
+        res.statusCode = 200;
+        res.setHeader('Content-Type','application/json');
+        return res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        return serverError(res, e);
+      }
+    }
+
     // Set/Deploy flows
     if (req.method === 'POST' && pathname === '/flows') {
       try {
@@ -188,4 +253,3 @@ export async function startApiServer({ runtime }) {
     if (TOKEN) console.log('Auth: Bearer token required (NR_SERVER_TOKEN set)');
   });
 }
-

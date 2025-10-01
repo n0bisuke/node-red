@@ -86,6 +86,39 @@ await runtime.init(settings, server, null);
 // Pass the public runtime API, not the internal `_` object
 editorAPI.init(settings, server, runtime.storage, runtime);
 
+// Proxy Inject click from Editor to remote runtime before admin apps handle it
+if (process.env.REMOTE_BASE_URL) {
+  app.post(settings.httpAdminRoot + '/inject/:id', express.json({ limit: '1mb' }), async (req, res) => {
+    try {
+      const id = req.params.id;
+      const url = new URL(`/inject/${id}`, REMOTE_BASE_URL);
+      const useHttps = url.protocol === 'https:';
+      const lib = await import(useHttps ? 'https' : 'http');
+      const headers = { 'Content-Type': 'application/json' };
+      if (REMOTE_TOKEN) headers['Authorization'] = `Bearer ${REMOTE_TOKEN}`;
+      const resp = await new Promise((resolve, reject) => {
+        const r = lib.request({
+          method: 'POST', hostname: url.hostname,
+          port: url.port || (useHttps ? 443 : 80),
+          path: url.pathname + (url.search || ''), headers
+        }, (rr) => {
+          let data = '';
+          rr.setEncoding('utf8');
+          rr.on('data', (c) => (data += c));
+          rr.on('end', () => resolve({ status: rr.statusCode, text: data }));
+        });
+        r.on('error', reject);
+        r.write(JSON.stringify(req.body || {}));
+        r.end();
+      });
+      res.status(resp.status).type('application/json');
+      try { res.send(JSON.parse(resp.text)); } catch { res.send(resp.text); }
+    } catch (e) {
+      res.status(502).json({ error: 'bad_gateway', message: e?.message || String(e) });
+    }
+  });
+}
+
 // Helper to POST current flows to remote runtime
 async function mirrorToRemote() {
   if (!REMOTE_BASE_URL) return { ok: false, error: 'remote_not_configured' };
@@ -143,6 +176,50 @@ if (AUTO_MIRROR) {
   });
 }
 
+// Bridge remote debug SSE to local editor comms (so Debug panel shows messages)
+async function startRemoteDebugBridge() {
+  if (!REMOTE_BASE_URL) return;
+  try {
+    const url = new URL('/events/debug', REMOTE_BASE_URL);
+    const useHttps = url.protocol === 'https:';
+    const lib = await import(useHttps ? 'https' : 'http');
+    const headers = {};
+    if (REMOTE_TOKEN) headers['Authorization'] = `Bearer ${REMOTE_TOKEN}`;
+    const req = lib.request({
+      method: 'GET', hostname: url.hostname,
+      port: url.port || (useHttps ? 443 : 80),
+      path: url.pathname + (url.search || ''), headers
+    }, (res) => {
+      res.setEncoding('utf8');
+      let buffer = '';
+      res.on('data', (chunk) => {
+        buffer += chunk;
+        let idx;
+        while ((idx = buffer.indexOf('\n\n')) >= 0) {
+          const block = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          const line = block.split('\n').find(l => l.startsWith('data: '));
+          if (line) {
+            const json = line.slice(6);
+            try {
+              const payload = JSON.parse(json);
+              // Re-publish into local editor comms as 'debug'
+              runtime.events.emit('comms', { topic: 'debug', data: payload, retain: false });
+            } catch {}
+          }
+        }
+      });
+    });
+    req.on('error', (e) => {
+      console.warn('[editor] debug bridge error:', e?.message || e);
+      setTimeout(startRemoteDebugBridge, 5000);
+    });
+    req.end();
+  } catch (e) {
+    console.warn('[editor] debug bridge setup failed:', e?.message || e);
+  }
+}
+
 // Mount runtime admin app first to serve node-provided admin assets
 app.use(settings.httpAdminRoot, runtime.httpAdmin);
 // Then mount the editor-api app under the same root
@@ -198,6 +275,9 @@ app.get('/admin/remote/health', async (req, res) => {
 // Start editor server (runtime + editor)
 await runtime.start();
 await editorAPI.start();
+
+// Start debug bridge after editor is ready
+startRemoteDebugBridge();
 
 // Log runtime messages for troubleshooting
 events.on('log', (rec) => {
