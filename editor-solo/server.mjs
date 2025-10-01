@@ -222,8 +222,13 @@ async function startRemoteDebugBridge() {
             const json = line.slice(6);
             try {
               const payload = JSON.parse(json);
-              // Re-publish into local editor comms as 'debug'
-              runtime.events.emit('comms', { topic: 'debug', data: payload, retain: false });
+              // Support both shapes:
+              // 1) { id, msg, ... } (direct debug message)
+              // 2) { topic: 'debug', data: { id, msg, ... } }
+              const message = (payload && typeof payload === 'object' && 'data' in payload && payload.topic === 'debug')
+                ? payload.data
+                : payload;
+              runtime.events.emit('comms', { topic: 'debug', data: message, retain: false });
             } catch {}
           }
         }
