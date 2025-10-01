@@ -120,6 +120,37 @@ export async function startApiServer({ runtime }) {
       }
     }
 
+    // Capabilities: supported node types and API flags
+    if (req.method === 'GET' && pathname === '/caps') {
+      try {
+        let types = [];
+        try {
+          const list = await runtime.nodes.getNodeList({});
+          // list: [{module,types:[...]}, ...]
+          const set = new Set();
+          (list || []).forEach(m => (m.types || []).forEach(t => set.add(t)));
+          types = Array.from(set).sort();
+        } catch (e) {
+          // Fallback: unknown types
+          types = [];
+        }
+        const caps = {
+          api: {
+            flows: true,
+            inject: true,
+            eventsDebug: true,
+            health: true,
+            state: true
+          },
+          nodes: types
+        };
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify(caps));
+      } catch (e) {
+        return serverError(res, e);
+      }
+    }
+
     // Server-Sent Events: stream debug messages from runtime
     if (req.method === 'GET' && pathname === '/events/debug') {
       res.writeHead(200, {

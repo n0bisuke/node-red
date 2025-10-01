@@ -125,6 +125,25 @@ async function mirrorToRemote() {
   try {
     const current = await runtime.flows.getFlows({});
     const body = { flows: current.flows || [], credentials: current.credentials || {} };
+    // Soft validation against remote caps (if available)
+    try {
+      const caps = await getRemoteCaps();
+      if (caps && Array.isArray(caps.nodes)) {
+        const used = new Set();
+        for (const n of body.flows) {
+          if (!n || typeof n.type !== 'string') continue;
+          const t = n.type;
+          if (t === 'tab' || t === 'group' || t === 'subflow' || t === 'comment' || t === 'junction') continue;
+          used.add(t);
+        }
+        const unknown = Array.from(used).filter(t => !caps.nodes.includes(t));
+        if (unknown.length) {
+          console.warn('[editor] caps warn: unsupported node types on remote:', unknown.join(', '));
+        }
+      }
+    } catch (e) {
+      console.warn('[editor] caps check failed:', e?.message || e);
+    }
     const url = new URL('/flows', REMOTE_BASE_URL);
     url.searchParams.set('deploymentType', REMOTE_DEPLOYMENT_TYPE);
     const headers = { 'Content-Type': 'application/json' };
@@ -220,6 +239,32 @@ async function startRemoteDebugBridge() {
   }
 }
 
+// Fetch remote capabilities (supported nodes / API flags)
+async function getRemoteCaps() {
+  if (!REMOTE_BASE_URL) return null;
+  const url = new URL('/caps', REMOTE_BASE_URL);
+  const useHttps = url.protocol === 'https:';
+  const lib = await import(useHttps ? 'https' : 'http');
+  const headers = {};
+  if (REMOTE_TOKEN) headers['Authorization'] = `Bearer ${REMOTE_TOKEN}`;
+  const resp = await new Promise((resolve, reject) => {
+    const r = lib.request({
+      method: 'GET', hostname: url.hostname,
+      port: url.port || (useHttps ? 443 : 80),
+      path: url.pathname + (url.search || ''), headers
+    }, (rr) => {
+      let data = '';
+      rr.setEncoding('utf8');
+      rr.on('data', (c) => (data += c));
+      rr.on('end', () => resolve({ status: rr.statusCode, text: data }));
+    });
+    r.on('error', reject);
+    r.end();
+  });
+  if (resp.status < 200 || resp.status >= 300) throw new Error(`caps http ${resp.status}`);
+  try { return JSON.parse(resp.text); } catch { return null; }
+}
+
 // Mount runtime admin app first to serve node-provided admin assets
 app.use(settings.httpAdminRoot, runtime.httpAdmin);
 // Then mount the editor-api app under the same root
@@ -267,6 +312,18 @@ app.get('/admin/remote/health', async (req, res) => {
     });
     let body; try { body = JSON.parse(resp.text) } catch { body = { raw: resp.text } }
     res.status(resp.status).json(body);
+  } catch (e) {
+    res.status(502).json({ error: 'bad_gateway', message: e?.message || String(e) });
+  }
+});
+
+// Capabilities proxy to remote runtime
+app.get('/admin/remote/caps', async (req, res) => {
+  if (!REMOTE_BASE_URL) return res.status(400).json({ error: 'remote_not_configured' });
+  try {
+    const caps = await getRemoteCaps();
+    if (!caps) return res.status(502).json({ error: 'bad_gateway' });
+    res.json(caps);
   } catch (e) {
     res.status(502).json({ error: 'bad_gateway', message: e?.message || String(e) });
   }
