@@ -20,9 +20,10 @@
   1. `app.use('/admin', runtime.httpAdmin)`
   2. `app.use('/admin', editorAPI.httpAdmin)`
   - ノードが提供する管理用アセット（例: `/admin/debug/view/debug-utils.js`）を先に解決させるため、`runtime.httpAdmin` を前に配置
-- リモートデプロイ補助:
-  - `POST /admin/remote/deploy`
-  - 実装: `runtime.flows.getFlows({})` で現在フローを取得し、`REMOTE_BASE_URL/flows?deploymentType=...` に POST（Bearer `REMOTE_TOKEN` 対応）
+- リモートデプロイ連携:
+  - 手動: `POST /admin/remote/deploy`
+  - 自動: Deploy 成功後に `REMOTE_BASE_URL/flows` へ自動POST（`EDITOR_AUTO_MIRROR`、既定 true）
+  - ヘルス: `GET /admin/remote/health`（リモートの `/health` をプロキシ）
 
 ## 起動方法（エディタ）
 ```
@@ -34,7 +35,8 @@ REMOTE_TOKEN=<ランタイム側のNR_SERVER_TOKEN> \
 npm start
 ```
 - エディタ: `http://localhost:1881/admin`
-- リモートへデプロイ: `curl -X POST http://localhost:1881/admin/remote/deploy`
+- リモートへデプロイ（手動）: `curl -X POST http://localhost:1881/admin/remote/deploy`
+- リモートへデプロイ（自動）: Deploy 成功後に自動ミラー（`EDITOR_AUTO_MIRROR=false` で無効化可）
 
 ## 起動方法（ランタイム側・参考）
 - ルートの `run.mjs` は headless ランタイム + 最小API サーバー
@@ -54,6 +56,9 @@ ENABLE_API_SERVER=false node run.mjs
 - `REMOTE_BASE_URL`（例: `http://localhost:1880`）
 - `REMOTE_TOKEN`（ランタイム側 `NR_SERVER_TOKEN`）
 - `REMOTE_DEPLOYMENT_TYPE`（既定 `full`）
+- `EDITOR_AUTO_MIRROR`（既定 true）
+- `EDITOR_ADMIN_USER` + `EDITOR_ADMIN_PASSWORD_HASH`（任意: editor 側 adminAuth）
+- `EDITOR_ADMIN_PASSWORD`（任意: 平文 → 起動時に bcryptjs でハッシュ化）
 
 ## これまでに解消した問題
 - editor-api 初期化で `runtimeAPI.isStarted(...).then is not a function`
@@ -68,12 +73,10 @@ ENABLE_API_SERVER=false node run.mjs
 
 ## 既知の制限
 - エディタ側は safeMode のためフローは実行されない（設計通り）
-- 認証（adminAuth）は未設定。実験用途前提
-- Deploy ボタン押下時に自動ミラー送信は未連携（手動で `/admin/remote/deploy`）
+- editor 側の adminAuth は簡易（環境変数での資格情報指定）。細かな権限分離は未対応
 
 ## 次のステップ（TODO）
-- エディタの「デプロイ」操作にフックしてリモートへ自動ミラー送信
-- editor 側の認証（`adminAuth`）追加
+- Deploy UI にリモート送信結果（成功/失敗）を通知表示
 - リモートランタイムのログをエディタでライブ表示（SSE/WS 中継）
 - Docker/Compose 化（editor と runtime を別サービスに）
 - Cloudflare Workers 等の非 Node 環境を想定した API 互換範囲の洗い出し
@@ -83,8 +86,18 @@ ENABLE_API_SERVER=false node run.mjs
   - `GET /admin/nodes` が 200 か
   - `GET /admin/debug/view/debug-utils.js` が 200 か（Content-Type: application/javascript）
   - `GET /admin/nodes/messages?lng=ja` が 200 か
-- サーバーログ
-  - `[editor:error]` が出ていないか
-- データ
-  - `editor-solo/data-editor/flows.json` を一旦退避し空で起動し直す
+  - サーバーログ
+    - `[editor:error]` が出ていないか
+  - データ
+    - `editor-solo/data-editor/flows.json` を一旦退避し空で起動し直す
 
+## 接続確認（Editor → Runtime）
+1. ランタイム起動: `NR_SERVER_TOKEN=... node run.mjs`
+2. エディタ起動: `EDITOR_PORT=1881 REMOTE_BASE_URL=http://localhost:1880 REMOTE_TOKEN=... npm start`
+3. エディタで Deploy 実行
+   - ターミナル: `[editor] auto-mirror ok: 200` が表示
+   - ランタイム: `BASE_URL=http://localhost:1880 NR_SERVER_TOKEN=... npm run tools:get` で反映確認
+4. 失敗時の代表例
+   - 401/403: REMOTE_TOKEN 不一致
+   - 404: ランタイムの `/flows` 無効（`ENABLE_API_SERVER=false`）
+   - 5xx: ランタイム側エラー（ランタイムログ参照）
